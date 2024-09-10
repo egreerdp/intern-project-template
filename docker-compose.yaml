@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    container_name: my_go_app
+    restart: unless-stopped
+    volumes:
+      - .:/app
