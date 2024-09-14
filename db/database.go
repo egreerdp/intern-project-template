@@ -9,37 +9,78 @@ import (
 
 type UserStore interface {
 	GetUser(id string) (*User, error)
+	CreateUser(user *User) (int, error)
+	UpdateUser(user *User) (int, error)
+	DeleteUser(id int) error
 }
 
-// Define a simple User model
 type User struct {
 	gorm.Model
+	Name string `json:"name"`
 }
 
-// Database struct to manage the connection
 type Database struct {
 	DB *gorm.DB
 }
 
-// NewDatabase initializes a new SQLite database
 func NewDatabase(dbName string) *Database {
 	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
 	}
 
-	// Auto migrate the User model
-	db.AutoMigrate(&User{})
+	err = db.AutoMigrate(&User{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return &Database{DB: db}
 }
 
 func (db *Database) GetUser(id string) (*User, error) {
 	var user *User
-	tx := db.DB.Find(user, id)
+	tx := db.DB.First(&user, id)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
 
 	return user, nil
+}
+
+func (db *Database) CreateUser(user *User) (int, error) {
+	tx := db.DB.Save(&user)
+	if tx.Error != nil {
+		return -1, tx.Error
+	}
+
+	tx = tx.Find(&user)
+	if tx.Error != nil {
+		return -1, tx.Error
+	}
+
+	return int(user.ID), nil
+}
+
+func (db *Database) UpdateUser(user *User) (int, error) {
+	tx := db.DB.Save(&user)
+	if tx.Error != nil {
+		return -1, tx.Error
+	}
+
+	tx = tx.Find(&user)
+	if tx.Error != nil {
+		return -1, tx.Error
+	}
+
+	return int(user.ID), nil
+}
+
+func (db *Database) DeleteUser(id int) error {
+	var user User
+	tx := db.DB.Model(User{}).Delete(&user, id)
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	return nil
 }
