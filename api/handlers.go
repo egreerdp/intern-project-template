@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/egreerdp/intern-project-template/db"
+	mymiddleware "github.com/egreerdp/intern-project-template/internal/middleware"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -32,6 +33,8 @@ func (h Handler) MountRoutes() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	r.Use(mymiddleware.JWTAuth)
 
 	r.Get("/{id}", h.HandleGetUser)
 	r.Post("/", h.HandleCreateUser)
