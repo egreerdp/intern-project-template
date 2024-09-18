@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -9,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/egreerdp/intern-project-template/db"
-	mymiddleware "github.com/egreerdp/intern-project-template/internal/middleware"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -30,16 +31,28 @@ func NewHandler(db db.UserStore) *Handler {
 func (h Handler) MountRoutes() http.Handler {
 	r := chi.NewRouter()
 
+	// Middleware
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	// r.Use(mymiddleware.JWTAuth)
 
-	r.Use(mymiddleware.JWTAuth)
+	// API routes
+	r.Get("/api/v1/{id}", h.HandleGetUser)
+	r.Post("/api/v1/", h.HandleCreateUser)
+	r.Put("/api/v1/{id}", h.HandleUpdateUser)
+	r.Delete("/api/v1/{id}", h.HandleDeleteUser)
 
-	r.Get("/{id}", h.HandleGetUser)
-	r.Post("/", h.HandleCreateUser)
-	r.Put("/{id}", h.HandleUpdateUser)
-	r.Delete("/{id}", h.HandleDeleteUser)
+	// Serve index.html at the root "/"
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./api/views/index.html")
+	})
+
+	// Serve static files under "/static/*"
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./api/public"))))
+
+	r.Get("/api/v1/users", h.HandleGetUsers)
+	r.Delete("/api/v1/users", h.HandleDeleteUserView)
 
 	return r
 }
@@ -152,4 +165,68 @@ func (h Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("Deleted user", "id", userId)
 	render.JSON(w, r, map[string]any{"user_id": userId})
+}
+
+func (h Handler) HandleGetUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.db.GetUsers()
+	if err != nil {
+		http.Error(w, "Unable to fetch users", http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, err := template.ParseFiles("./api/public/table.html")
+	if err != nil {
+		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
+		return
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, users)
+	if err != nil {
+		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
+		return
+	}
+
+	// Set the response content type and write the buffer to the response
+	w.Header().Set("Content-Type", "text/html")
+	w.Write(buf.Bytes())
+}
+
+func (h Handler) HandleDeleteUserView(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(userID)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	err = h.db.DeleteUser(id)
+	if err != nil {
+		http.Error(w, "Unable to delete user", http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch the updated user list and render the table
+	users, err := h.db.GetUsers()
+	if err != nil {
+		http.Error(w, "Unable to fetch users", http.StatusInternalServerError)
+		return
+	}
+
+	// Render the updated table
+	tmpl, err := template.ParseFiles("./api/public/table.html")
+	if err != nil {
+		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
+		return
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, users)
+	if err != nil {
+		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write(buf.Bytes())
 }

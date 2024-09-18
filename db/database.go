@@ -12,11 +12,13 @@ type UserStore interface {
 	CreateUser(user *User) (int, error)
 	UpdateUser(user *User) (int, error)
 	DeleteUser(id int) error
+	GetUsers() ([]User, error)
 }
 
 type User struct {
 	gorm.Model
-	Name string `json:"name"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 type Database struct {
@@ -83,4 +85,13 @@ func (db *Database) DeleteUser(id int) error {
 	}
 
 	return nil
+}
+
+func (db *Database) GetUsers() ([]User, error) {
+	var users []User
+	tx := db.DB.Find(&users)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return users, nil
 }
