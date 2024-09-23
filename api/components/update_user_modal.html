@@ -1,0 +1,46 @@
+<div class="modal modal-open">
+  <div class="modal-box">
+    <h2 class="font-bold text-lg mb-4">Update User</h2>
+
+    <form hx-post="/users/{{.ID}}" hx-target="#user-table" hx-swap="innerHTML">
+      <div class="form-control mb-4">
+        <label class="label">
+          <span class="label-text">Name</span>
+        </label>
+        <input
+          type="text"
+          name="name"
+          value="{{.Name}}"
+          class="input input-bordered"
+          required
+        />
+      </div>
+
+      <div class="form-control mb-4">
+        <label class="label">
+          <span class="label-text">Email</span>
+        </label>
+        <input
+          type="email"
+          name="email"
+          value="{{.Email}}"
+          class="input input-bordered"
+          required
+        />
+      </div>
+
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Update</button>
+        <button
+          type="button"
+          class="btn"
+          hx-get="/cancel-modal"
+          hx-target="#modal"
+          hx-swap="outerHTML"
+        >
+          Close
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

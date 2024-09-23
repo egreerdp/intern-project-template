@@ -1,0 +1,39 @@
+<table class="table table-zebra table-fixed">
+  <thead>
+    <tr class="space-between">
+      <th class="w/4">ID</th>
+      <th class="w/4">Name</th>
+      <th class="w/4">Email</th>
+      <th class="w/4">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .}}
+    <tr>
+      <td>{{.ID}}</td>
+      <td>{{.Name}}</td>
+      <td>{{.Email}}</td>
+      <td>
+        <button
+          class="btn btn-secondary btn-sm"
+          hx-get="/users/{{.ID}}/edit"
+          type="button"
+          hx-target="#modal"
+          hx-trigger="click"
+        >
+          Edit
+        </button>
+        <button
+          class="btn btn-error btn-sm"
+          hx-delete="/users/{{.ID}}"
+          hx-confirm="Are you sure you want to delete user {{.ID}}?"
+          hx-target="#user-table"
+          hx-swap="innerHTML"
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>

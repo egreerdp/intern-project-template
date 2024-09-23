@@ -1,0 +1,39 @@
+<div class="modal modal-open">
+  <div class="modal-box">
+    <h2 class="font-bold text-lg mb-4">Create New User</h2>
+
+    <form hx-post="/users" hx-target="#user-table" hx-swap="innerHTML">
+      <div class="form-control mb-4">
+        <label class="label">
+          <span class="label-text">Name</span>
+        </label>
+        <input type="text" name="name" class="input input-bordered" required />
+      </div>
+
+      <div class="form-control mb-4">
+        <label class="label">
+          <span class="label-text">Email</span>
+        </label>
+        <input
+          type="email"
+          name="email"
+          class="input input-bordered"
+          required
+        />
+      </div>
+
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Create</button>
+        <button
+          type="button"
+          class="btn"
+          hx-get="/cancel-modal"
+          hx-target="#modal"
+          hx-swap="outerHTML"
+        >
+          Close
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
