@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"log/slog"
@@ -32,7 +33,6 @@ func NewHandler(db db.UserStore) *Handler {
 func (h Handler) MountRoutes() http.Handler {
 	r := chi.NewRouter()
 
-	// Middleware
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -47,13 +47,27 @@ func (h Handler) MountRoutes() http.Handler {
 	})
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./api/views/index.html")
+		tmpl := template.Must(template.ParseFiles("./api/views/index.html"))
+
+		var buf bytes.Buffer
+		err := tmpl.Execute(&buf, nil)
+		if err != nil {
+			logger.Error("Could not execute template", "err", err)
+			return
+		}
+
+		render.HTML(w, r, buf.String())
 	})
 
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./api/public"))))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./api/components"))))
 
-	r.Get("/api/v1/users", h.HandleGetUsers)
-	r.Delete("/api/v1/users", h.HandleDeleteUserView)
+	r.Get("/users", h.HandleGetUsers)
+	r.Delete("/users/{id}", h.HandleDeleteUserView)
+	r.Get("/users/modal", h.HandleNewUserForm)
+	r.Post("/users", h.HandleCreateUserView)
+	r.Get("/cancel-modal", h.HandleCancel)
+	r.Get("/users/{id}/edit", h.HandleEditUserModal)
+	r.Post("/users/{id}", h.HandleUpdateUserView)
 
 	return r
 }
@@ -91,6 +105,12 @@ func (h Handler) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if user.Name == "" {
 		render.Status(r, 400)
 		render.JSON(w, r, map[string]any{"msg": "user must have a name"})
+		return
+	}
+
+	if user.Email == "" {
+		render.Status(r, 400)
+		render.JSON(w, r, map[string]any{"msg": "user must have an email"})
 		return
 	}
 
@@ -137,6 +157,12 @@ func (h Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.Email == "" {
+		render.Status(r, 400)
+		render.JSON(w, r, map[string]any{"msg": "user must have an email"})
+		return
+	}
+
 	userId, err := h.db.UpdateUser(&user)
 	if err != nil {
 		render.Status(r, 500)
@@ -168,66 +194,174 @@ func (h Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, map[string]any{"user_id": userId})
 }
 
+//**************************************************************
+//********************* FRONT END HANDLERS *********************
+//**************************************************************
+
 func (h Handler) HandleGetUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.db.GetUsers()
 	if err != nil {
-		http.Error(w, "Unable to fetch users", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	tmpl, err := template.ParseFiles("./api/public/table.html")
+	tmpl, err := template.ParseFiles("./api/components/table.html")
 	if err != nil {
-		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, users)
+	err = tmpl.Execute(w, users)
 	if err != nil {
-		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
-
-	// Set the response content type and write the buffer to the response
-	w.Header().Set("Content-Type", "text/html")
-	w.Write(buf.Bytes())
 }
 
 func (h Handler) HandleDeleteUserView(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(userID)
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
 	err = h.db.DeleteUser(id)
 	if err != nil {
-		http.Error(w, "Unable to delete user", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	// Fetch the updated user list and render the table
 	users, err := h.db.GetUsers()
 	if err != nil {
-		http.Error(w, "Unable to fetch users", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	// Render the updated table
-	tmpl, err := template.ParseFiles("./api/public/table.html")
+	tmpl, err := template.ParseFiles("./api/components/table.html")
 	if err != nil {
-		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, users)
+	err = tmpl.Execute(w, users)
 	if err != nil {
-		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+}
+
+func (h Handler) HandleNewUserForm(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./api/components/modal_form.html")
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+	tmpl.Execute(w, nil)
+}
+
+func (h Handler) HandleCreateUserView(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	w.Write(buf.Bytes())
+	user := db.User{
+		Name:  r.FormValue("name"),
+		Email: r.FormValue("email"),
+	}
+
+	_, err = h.db.CreateUser(&user)
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+
+	users, err := h.db.GetUsers()
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+
+	tmpl, err := template.ParseFiles("./api/components/table.html")
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+
+	tmpl.Execute(w, users)
+}
+
+func (h Handler) HandleCancel(w http.ResponseWriter, r *http.Request) {
+	render.HTML(w, r, `<div id="modal"></div>`)
+}
+
+func (h Handler) HandleEditUserModal(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	user, err := h.db.GetUser(id)
+	if err != nil {
+		return
+	}
+
+	tmpl, err := template.ParseFiles("./api/components/update_user_modal.html")
+	if err != nil {
+		render.HTML(w, r, fmt.Sprintf("<p>%s</p>", err.Error()))
+		return
+	}
+
+	tmpl.Execute(w, user)
+}
+
+func (h Handler) HandleUpdateUserView(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	name := r.FormValue("name")
+	email := r.FormValue("email")
+
+	user := db.User{
+		Name:  name,
+		Email: email,
+	}
+
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		render.Status(r, 400)
+		render.HTML(w, r, err.Error())
+	}
+	user.ID = uint(intID)
+
+	if user.Name == "" {
+		render.Status(r, 400)
+		render.HTML(w, r, err.Error())
+		return
+	}
+
+	if user.Email == "" {
+		render.Status(r, 400)
+		render.HTML(w, r, err.Error())
+		return
+	}
+
+	_, err = h.db.UpdateUser(&user)
+	if err != nil {
+		render.Status(r, 500)
+		render.HTML(w, r, err.Error())
+		return
+	}
+
+	tmpl, err := template.ParseFiles("./api/components/table.html")
+	if err != nil {
+		render.Status(r, 500)
+		render.HTML(w, r, err.Error())
+		return
+	}
+
+	users, err := h.db.GetUsers()
+	if err != nil {
+		render.Status(r, 500)
+		render.HTML(w, r, err.Error())
+		return
+	}
+
+	tmpl.Execute(w, users)
 }

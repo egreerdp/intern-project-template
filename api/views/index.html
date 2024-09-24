@@ -1,25 +1,40 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" id="html">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+    <title>User Manager</title>
+  </head>
+  <body class="p-6">
+    <header class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">User Manager</h1>
+      <button
+        type="button"
+        class="btn btn-primary"
+        hx-get="/users/modal"
+        hx-target="#modal"
+        hx-trigger="click"
+      >
+        Create New User
+      </button>
+    </header>
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/htmx.org@1.9.2"></script>
-  <title>User Manager</title>
-</head>
+    <div
+      class="overflow-x-auto w-screen"
+      id="user-table"
+      hx-trigger="load"
+      hx-get="/users"
+      hx-target="this"
+      hx-swap="innerHTML"
+    ></div>
 
-<body class="p-6">
-  <header class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">User Manager</h1>
-    <button type="button" class="btn btn-primary">Create New User</button>
-  </header>
-
-  <div class="flex justify-end mb-6"></div>
-
-  <div class="overflow-x-auto" id="user-table" hx-trigger="load" hx-get="/api/v1/users" hx-target="this"
-    hx-swap="innerHTML"></div>
-</body>
-
+    <div id="modal"></div>
+  </body>
 </html>
