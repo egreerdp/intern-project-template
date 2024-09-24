@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/egreerdp/intern-project-template/db"
+	mymiddleware "github.com/egreerdp/intern-project-template/internal/middleware"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
@@ -35,20 +36,20 @@ func (h Handler) MountRoutes() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	// r.Use(mymiddleware.JWTAuth)
 
-	// API routes
-	r.Get("/api/v1/{id}", h.HandleGetUser)
-	r.Post("/api/v1/", h.HandleCreateUser)
-	r.Put("/api/v1/{id}", h.HandleUpdateUser)
-	r.Delete("/api/v1/{id}", h.HandleDeleteUser)
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(mymiddleware.JWTAuth)
 
-	// Serve index.html at the root "/"
+		r.Get("/{id}", h.HandleGetUser)
+		r.Post("/", h.HandleCreateUser)
+		r.Put("/{id}", h.HandleUpdateUser)
+		r.Delete("/{id}", h.HandleDeleteUser)
+	})
+
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./api/views/index.html")
 	})
 
-	// Serve static files under "/static/*"
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./api/public"))))
 
 	r.Get("/api/v1/users", h.HandleGetUsers)
@@ -119,7 +120,7 @@ func (h Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	intID, err := strconv.Atoi(id)
 	if err != nil {
 		render.Status(r, 400)
-		render.JSON(w, r, map[string]any{"msg": "id must be a valid intger"})
+		render.JSON(w, r, map[string]any{"msg": "id must be a valid integer"})
 	}
 	user.ID = uint(intID)
 
